@@ -58,7 +58,18 @@ def plot_trend(result: dict, months_ahead: float, ticker: str, out_path: str | N
                     edgecolor="black", zorder=6,
                     label=("Golden cross" if c["kind"] == "golden" else "Death cross"))
 
-    plt.title(f"{result['resolved_ticker']} - 1yr price with trend, SMA50/SMA200")
+    for lvl in result["resistance"]:
+        plt.axhline(lvl["price"], color="crimson", linestyle=":", linewidth=1,
+                    label="Resistance" if lvl is result["resistance"][0] else None)
+        plt.text(data.index[-1], lvl["price"], f" {symbol}{lvl['price']:,.2f}",
+                  color="crimson", fontsize=8, va="bottom")
+    for lvl in result["support"]:
+        plt.axhline(lvl["price"], color="seagreen", linestyle=":", linewidth=1,
+                    label="Support" if lvl is result["support"][0] else None)
+        plt.text(data.index[-1], lvl["price"], f" {symbol}{lvl['price']:,.2f}",
+                  color="seagreen", fontsize=8, va="bottom")
+
+    plt.title(f"{result['resolved_ticker']} - 1yr price with trend, SMA50/SMA200, support/resistance")
     plt.xlabel("Date")
     plt.ylabel(f"Price ({currency})")
     handles, labels = plt.gca().get_legend_handles_labels()
@@ -111,6 +122,18 @@ def main():
         print(f"Latest SMA50/SMA200 signal: {label} on {last['date'].date()} at {symbol}{last['price']:,.2f}")
     else:
         print("Latest SMA50/SMA200 signal: none in the last 12 months")
+
+    if result["resistance"]:
+        levels = ", ".join(f"{symbol}{r['price']:,.2f} ({r['touches']}x)" for r in result["resistance"])
+        print(f"Resistance levels:      {levels}")
+    else:
+        print("Resistance levels:      none found above current price")
+
+    if result["support"]:
+        levels = ", ".join(f"{symbol}{s['price']:,.2f} ({s['touches']}x)" for s in result["support"])
+        print(f"Support levels:         {levels}")
+    else:
+        print("Support levels:         none found below current price")
 
     plot_trend(result, args.months, args.ticker, out_path, show=not args.no_show)
 

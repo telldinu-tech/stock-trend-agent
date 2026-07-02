@@ -86,6 +86,60 @@ def find_crosses(data: pd.DataFrame):
     return crosses
 
 
+def find_support_resistance(data: pd.DataFrame, window: int = 10, tolerance_pct: float = 0.02, max_levels: int = 3):
+    """Find horizontal support/resistance levels by locating local price
+    pivots (swing highs/lows over a +/-`window` day span) and clustering
+    pivots that sit within `tolerance_pct` of each other into one level.
+    Levels with more touches are considered stronger."""
+    close = data["Close"].to_numpy()
+    dates = data.index
+    n = len(close)
+
+    pivot_highs, pivot_lows = [], []
+    for i in range(window, n - window):
+        segment = close[i - window: i + window + 1]
+        if close[i] == segment.max():
+            pivot_highs.append((dates[i], close[i]))
+        if close[i] == segment.min():
+            pivot_lows.append((dates[i], close[i]))
+
+    def cluster(pivots):
+        if not pivots:
+            return []
+        pivots = sorted(pivots, key=lambda p: p[1])
+        clusters, current = [], [pivots[0]]
+        for p in pivots[1:]:
+            if abs(p[1] - current[-1][1]) / current[-1][1] <= tolerance_pct:
+                current.append(p)
+            else:
+                clusters.append(current)
+                current = [p]
+        clusters.append(current)
+        return [
+            {
+                "price": sum(x[1] for x in c) / len(c),
+                "touches": len(c),
+                "last_date": max(x[0] for x in c),
+            }
+            for c in clusters
+        ]
+
+    current_price = close[-1]
+    highs = cluster(pivot_highs)
+    lows = cluster(pivot_lows)
+
+    resistance = sorted(
+        (h for h in highs if h["price"] > current_price),
+        key=lambda h: (-h["touches"], h["price"]),
+    )[:max_levels]
+    support = sorted(
+        (l for l in lows if l["price"] < current_price),
+        key=lambda l: (-l["touches"], -l["price"]),
+    )[:max_levels]
+
+    return {"support": support, "resistance": resistance}
+
+
 def fit_linear_trend(data: pd.DataFrame):
     x = np.arange(len(data))
     y = data["Close"].to_numpy()
@@ -124,6 +178,7 @@ def analyze(ticker: str, months_ahead: float = 3):
     current = data["Close"].iloc[-1]
     change_pct = (projected_price - current) / current * 100
     crosses = find_crosses(data)
+    levels = find_support_resistance(data)
 
     return {
         "data": data,
@@ -139,4 +194,6 @@ def analyze(ticker: str, months_ahead: float = 3):
         "projected": projected_price,
         "change_pct": change_pct,
         "crosses": crosses,
+        "support": levels["support"],
+        "resistance": levels["resistance"],
     }

@@ -86,7 +86,14 @@ if run and ticker:
                    edgecolor="black", zorder=6,
                    label=("Golden cross" if c["kind"] == "golden" else "Death cross"))
 
-    ax.set_title(f"{result['resolved_ticker']} - 1yr price with trend, SMA50/SMA200")
+    for lvl in result["resistance"]:
+        ax.axhline(lvl["price"], color="crimson", linestyle=":", linewidth=1,
+                   label="Resistance" if lvl is result["resistance"][0] else None)
+    for lvl in result["support"]:
+        ax.axhline(lvl["price"], color="seagreen", linestyle=":", linewidth=1,
+                   label="Support" if lvl is result["support"][0] else None)
+
+    ax.set_title(f"{result['resolved_ticker']} - 1yr price, trend, SMA50/SMA200, support/resistance")
     ax.set_xlabel("Date")
     ax.set_ylabel(f"Price ({currency})")
     handles, labels = ax.get_legend_handles_labels()
@@ -96,6 +103,22 @@ if run and ticker:
     fig.tight_layout()
 
     st.pyplot(fig, use_container_width=True)
+
+    sr_col1, sr_col2 = st.columns(2)
+    with sr_col1:
+        st.markdown("**Resistance**")
+        if result["resistance"]:
+            for r in result["resistance"]:
+                st.write(f"{symbol}{r['price']:,.2f}  ·  touched {r['touches']}x")
+        else:
+            st.write("None found above current price")
+    with sr_col2:
+        st.markdown("**Support**")
+        if result["support"]:
+            for s in result["support"]:
+                st.write(f"{symbol}{s['price']:,.2f}  ·  touched {s['touches']}x")
+        else:
+            st.write("None found below current price")
 
     if result["crosses"]:
         last = result["crosses"][-1]
@@ -114,7 +137,8 @@ if run and ticker:
 
     st.caption(
         "Trend line is a naive linear extrapolation of the past year of prices. "
-        "SMA50/SMA200 crosses are a lagging signal, not a prediction. Not investment advice."
+        "SMA50/SMA200 crosses and support/resistance levels are lagging technical signals, "
+        "not predictions. Not investment advice."
     )
 else:
     st.info("Enter a ticker and tap **Analyze** to see the trend and projection.")
